@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-09
+
 ### Added
 
 - Shopping lists and to-do lists stored in Gladys (`/data/lists.json`), with
@@ -26,3 +28,6 @@ the notes of the version's GitHub Release.
 - Atomic writes with a backup of the previous version; an unreadable file is
   kept aside and the backup is read.
 - English, French, German and Spanish.
+
+[Unreleased]: https://github.com/guim31/gladys-local-lists/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/guim31/gladys-local-lists/releases/tag/v1.0.0
