@@ -137,6 +137,10 @@ test('the buttons: add, check off, uncheck, clear, with a toast in four language
   const unchecked = await tap(w, button(data, 'uncheck'), { item: milk.value });
   assert.equal(unchecked.data.message.en, '"Lait" is back on Courses.');
 
+  // A second tap from a stale tablet: still "back on", never "checked off".
+  const again = await tap(w, button(data, 'uncheck'), { item: milk.value });
+  assert.equal(again.data.message.en, '"Lait" is back on Courses.');
+
   data = await content(w);
   const cleared = await tap(w, button(data, 'clear_done'));
   assert.equal(cleared.data.message.en, 'Done items removed from Courses: 1.');

@@ -340,3 +340,73 @@ test('a scene change refreshes the widget, a reconnection publishes everything a
   await w.gladys.connect();
   assert.equal(w.fake.states.length, published + 3, 'every count sent again');
 });
+
+test('an overdue event Gladys refused is sent again at the next minute', async (t) => {
+  const clock = createClock(Date.UTC(2026, 10, 9, 19, 0));
+  const w = await world(t, { clock });
+  const before = events(w, 'task_overdue').length;
+  const original = w.gladys.publishSceneEvent.bind(w.gladys);
+  t.mock.method(w.gladys, 'publishSceneEvent', async () => {
+    throw new Error('Gladys unreachable');
+  });
+  clock.advance(MINUTE * 2);
+  await w.hub.tick();
+  assert.equal(events(w, 'task_overdue').length, before);
+  assert.equal(
+    w.hub.lists[1].items.find((item) => item.text === 'Sortir les poubelles').overdue_notified,
+    false,
+    'not remembered as sent',
+  );
+  w.gladys.publishSceneEvent.mock.mockImplementation(original);
+  clock.advance(MINUTE);
+  await w.hub.tick();
+  assert.deepEqual(
+    events(w, 'task_overdue')
+      .slice(before)
+      .map((event) => event.data.item),
+    ['Sortir les poubelles'],
+  );
+  await w.hub.tick();
+  assert.equal(events(w, 'task_overdue').length, before + 1, 'once');
+});
+
+test('a saved change succeeds even when Gladys does not take the devices', async (t) => {
+  const w = await world(t, { dataDir: emptyDataDir() });
+  t.mock.method(w.gladys, 'publishDiscoveredDevices', async () => {
+    throw new Error('socket closed');
+  });
+  const ack = await w.fake.action('create_list', { name: 'Zed', kind: 'shopping' });
+  assert.equal(ack.success, true, ack.error);
+  assert.deepEqual(
+    w.hub.lists.map((list) => list.name),
+    ['Zed'],
+  );
+});
+
+test('the lists renamed in Gladys: shown with both names, deleted by either', async (t) => {
+  const w = await world(t);
+  await createAll(w);
+  await w.fake.deviceUpdated({ ...w.fake.devices[0], name: 'Épicerie' });
+  assert.equal(
+    (await w.fake.action('show_lists', {})).data.message.en,
+    'Épicerie (Courses): 2 left · Maison: 3 left',
+  );
+  const deleted = await w.fake.action('delete_list', { name: 'epicerie' });
+  assert.equal(deleted.success, true, deleted.error);
+  assert.deepEqual(
+    w.hub.lists.map((list) => list.name),
+    ['Maison'],
+  );
+});
+
+test('set_item_done finds an item added with a text longer than the limit', async (t) => {
+  const w = await world(t);
+  const long = `Article ${'x'.repeat(300)}`;
+  await w.fake.sceneAction('add_item', { list: groceries(w).device, item: long });
+  const ack = await w.fake.sceneAction('set_item_done', {
+    list: groceries(w).device,
+    item: long,
+    state: 'done',
+  });
+  assert.equal(ack.data.outputs.found, true);
+});

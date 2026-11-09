@@ -79,7 +79,7 @@ Each trigger can be limited to one list (empty: any list).
 ### Actions
 
 - **Add to a local list**: the list, the item, and for a to-do list an
-  optional due date: `2026-11-20`, `20/11/2026`, `20/11/2026 18:30`, or
+  optional due date: `2026-11-20`, `20/11/2026` (day first), `20/11/2026 18:30`, or
   `+N` for N days from today (`+0` is today, `+1 08:00` tomorrow at 8 am).
   An item already on the list is not added twice (a task gets the new due
   date); an item checked off before is put back.

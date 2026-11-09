@@ -53,6 +53,25 @@ export class ListsHub {
     this.document = { schema: 1, lists: [] };
     this.queue = Promise.resolve();
     this.timer = null;
+    // Problems logged once, until they are over (key → message).
+    this.problems = new Map();
+  }
+
+  // --- Quiet logs: one line when a problem starts, one when it ends --------
+
+  problem(key, text) {
+    if (!this.problems.has(key)) {
+      logger.warn(text);
+    } else {
+      logger.debug(text);
+    }
+    this.problems.set(key, text);
+  }
+
+  resolved(key) {
+    if (this.problems.delete(key)) {
+      logger.info(`Back to normal: ${key}`);
+    }
   }
 
   // --- Lifecycle -------------------------------------------------------------
@@ -69,13 +88,15 @@ export class ListsHub {
       // stays as lists.json.corrupt, the backup is left untouched).
       await this.store.save(document).catch((err) => logger.error(`Cannot write: ${err.message}`));
     }
-    await this.resync(config);
-    if (this.timers) {
+    // The timer runs even if the first publication below fails: a later
+    // reconnection only resynchronizes.
+    if (this.timers && !this.timer) {
       this.timer = setInterval(() => {
-        this.tick().catch((err) => logger.warn(`Minute check failed: ${err.message}`));
+        this.tick().catch((err) => this.problem('tick', `Minute check failed: ${err.message}`));
       }, TICK_MS);
       this.timer.unref?.();
     }
+    await this.resync(config);
   }
 
   /** After a (re)connection: send again what Gladys may have lost. */
@@ -141,9 +162,15 @@ export class ListsHub {
   // --- Publishing ------------------------------------------------------------
 
   async publishDevices() {
-    await this.gladys.publishDiscoveredDevices(
-      this.lists.map((list) => buildDevice(this.gladys, list, this.config.language)),
-    );
+    try {
+      await this.gladys.publishDiscoveredDevices(
+        this.lists.map((list) => buildDevice(this.gladys, list, this.config.language)),
+      );
+      this.resolved('devices');
+    } catch (err) {
+      // The lists are saved: the devices follow at the next scan or reconnection.
+      this.problem('devices', `Devices not published: ${err.message}`);
+    }
   }
 
   async publishStates(lists = this.createdLists()) {
@@ -154,19 +181,25 @@ export class ListsHub {
     }
     try {
       await this.gladys.publishChangedStates(states, { heartbeat: HEARTBEAT_MS });
+      this.resolved('states');
     } catch (err) {
-      logger.warn(`States not published: ${err.message}`);
+      this.problem('states', `States not published: ${err.message}`);
     }
   }
 
+  /** Publish scene events; resolves with the ones Gladys accepted. */
   async fire(events) {
-    for (const { key, data } of events) {
+    const sent = [];
+    for (const event of events) {
       try {
-        await this.gladys.publishSceneEvent(key, data);
+        await this.gladys.publishSceneEvent(event.key, event.data);
+        sent.push(event);
+        this.resolved('scene-event');
       } catch (err) {
-        logger.warn(`Scene event ${key} refused: ${err.message}`);
+        this.problem('scene-event', `Scene event ${event.key} refused: ${err.message}`);
       }
     }
+    return sent;
   }
 
   refreshWidget() {
@@ -280,7 +313,10 @@ export class ListsHub {
 
   deleteList({ name }) {
     return this.mutate((draft, effects) => {
-      const index = draft.lists.findIndex((list) => matchKey(list.name) === matchKey(name));
+      const wanted = matchKey(name);
+      const index = draft.lists.findIndex(
+        (list) => matchKey(list.name) === wanted || matchKey(this.displayName(list)) === wanted,
+      );
       if (index < 0) {
         throw new UserError('noListNamed', '', cleanText(name, LIMITS.name));
       }
@@ -372,7 +408,7 @@ export class ListsHub {
     return this.mutate(
       (draft, effects) => {
         const list = this.draftList(draft, { device, listId });
-        const key = text === undefined ? null : matchKey(text);
+        const key = text === undefined ? null : matchKey(cleanText(text, LIMITS.text));
         const candidates = list.items.filter((item) =>
           itemId ? item.id === itemId : matchKey(item.text) === key,
         );
@@ -441,39 +477,55 @@ export class ListsHub {
       return message('noLists', language);
     }
     return this.lists
-      .map((list) =>
-        message('summary', language, '', list.name, list.items.filter((i) => !i.done).length),
-      )
+      .map((list) => {
+        const shown = this.displayName(list);
+        const name = shown === list.name ? shown : `${shown} (${list.name})`;
+        return message('summary', language, '', name, list.items.filter((i) => !i.done).length);
+      })
       .join(' · ');
   }
 
   // --- Minute timer ----------------------------------------------------------
 
-  /** Fire the tasks that became overdue, republish the counts. */
+  /**
+   * Fire the tasks that became overdue, then republish the counts. A task is
+   * remembered as notified only once Gladys accepted its event: while Gladys
+   * is unreachable, it is tried again every minute.
+   */
   async tick() {
+    await this.queue;
     const overdue = this.overdueTest();
-    const fresh = this.lists.some(
-      (list) =>
-        list.kind === 'tasks' && list.items.some((item) => overdue(item) && !item.overdue_notified),
-    );
-    if (fresh) {
+    const pending = [];
+    if (this.gladys.connected !== false) {
+      for (const list of this.lists.filter((entry) => entry.kind === 'tasks')) {
+        for (const item of list.items.filter(
+          (entry) => overdue(entry) && !entry.overdue_notified,
+        )) {
+          pending.push({
+            listId: list.id,
+            itemId: item.id,
+            key: TRIGGERS.TASK_OVERDUE,
+            data: { ...this.eventBase(list), item: item.text, due: item.due },
+          });
+        }
+      }
+    }
+    const sent = await this.fire(pending);
+    if (sent.length > 0) {
       await this.mutate((draft, effects) => {
-        for (const list of draft.lists.filter((entry) => entry.kind === 'tasks')) {
-          for (const item of list.items.filter(
-            (entry) => overdue(entry) && !entry.overdue_notified,
-          )) {
+        for (const { listId, itemId } of sent) {
+          const item = draft.lists
+            .find((list) => list.id === listId)
+            ?.items.find((entry) => entry.id === itemId);
+          if (item && !item.done) {
             item.overdue_notified = true;
-            effects.events.push({
-              key: TRIGGERS.TASK_OVERDUE,
-              data: { ...this.eventBase(list), item: item.text, due: item.due },
-            });
+            effects.changed = true;
           }
         }
-        effects.changed = effects.events.length > 0;
-      }).catch((err) => logger.warn(`Overdue tasks not recorded: ${err.message}`));
-      return;
+      })
+        .then(() => this.resolved('save'))
+        .catch((err) => this.problem('save', `Overdue tasks not recorded: ${err.message}`));
     }
-    await this.queue;
     await this.publishStates();
   }
 }

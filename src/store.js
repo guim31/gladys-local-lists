@@ -14,13 +14,17 @@
 // with no list and says so in the logs. Nothing is ever deleted.
 // -----------------------------------------------------------------------------
 
-import { copyFile, mkdir, open, readFile, rename } from 'node:fs/promises';
+import { constants, copyFile, mkdir, open, readFile, rename } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createLogger } from '@gladysassistant/integration-sdk';
 import { emptyDocument, normalizeDocument, SCHEMA_VERSION } from './lists/model.js';
 
 const logger = createLogger({ name: 'local-lists-store' });
 export const FILE_NAME = 'lists.json';
+
+// Parse and shape errors: the file is broken. Any other error (EACCES, EIO…)
+// is a problem of the disk, not of the content.
+const isCorrupt = (err) => err instanceof SyntaxError || err instanceof TypeError;
 
 export class ListStore {
   constructor(directory = process.env.LOCAL_LISTS_DATA_DIR || '/data') {
@@ -52,13 +56,23 @@ export class ListStore {
     try {
       return { document: await this.read(this.path), source: 'file' };
     } catch (err) {
+      if (!isCorrupt(err) && err.code !== 'ENOENT') {
+        // A disk or permission error is not a broken file: never replace the
+        // lists with an older backup because of it. The start fails and is
+        // tried again at the next connection.
+        throw err;
+      }
       if (err.code !== 'ENOENT') {
         mainProblem = err;
+        // A first broken file is never overwritten by a second one.
+        const kept = await copyFile(this.path, this.corruptPath, constants.COPYFILE_EXCL)
+          .then(() => this.corruptPath)
+          .catch(() => {
+            const dated = `${this.corruptPath}-${Date.now()}`;
+            return copyFile(this.path, dated).then(() => dated);
+          });
         this.mainUnreadable = true;
-        logger.error(`Cannot read ${this.path} (${err.message}): kept as ${this.corruptPath}`);
-        await copyFile(this.path, this.corruptPath).catch((copyErr) =>
-          logger.warn(`Cannot copy ${this.path}: ${copyErr.message}`),
-        );
+        logger.error(`Cannot read ${this.path} (${err.message}): kept as ${kept}`);
       }
     }
     try {
@@ -68,6 +82,9 @@ export class ListStore {
       }
       return { document, source: 'backup' };
     } catch (err) {
+      if (!isCorrupt(err) && err.code !== 'ENOENT') {
+        throw err;
+      }
       if (err.code !== 'ENOENT') {
         logger.error(`Cannot read ${this.backupPath} either (${err.message})`);
       }
@@ -110,6 +127,13 @@ export class ListStore {
     }
     await rename(temporary, this.path);
     this.mainUnreadable = false;
+    // Make the rename itself durable (best effort: not every file system
+    // lets a directory be synced).
+    const directory = await open(this.directory, 'r').catch(() => null);
+    await directory
+      ?.sync()
+      .catch(() => {})
+      .finally(() => directory.close());
   }
 
   /** Resolves once every write asked for so far is over. */

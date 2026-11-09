@@ -6,7 +6,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ListStore } from '../src/store.js';
 import { normalizeDocument } from '../src/lists/model.js';
@@ -209,4 +209,32 @@ test('the chores fixture is read as is', async (t) => {
     'Changer le filtre de la hotte',
     'Arroser les plantes',
   ]);
+});
+
+test('a lists.json that cannot be read (permissions) is never replaced by the backup', async () => {
+  const dataDir = fixtureDataDir();
+  writeFileSync(join(dataDir, 'lists.json.bak'), '{"schema":1,"lists":[]}');
+  chmodSync(join(dataDir, 'lists.json'), 0o000);
+  try {
+    if (process.getuid?.() === 0) {
+      return; // root reads anything: nothing to check
+    }
+    await assert.rejects(new ListStore(dataDir).load(), { code: 'EACCES' });
+    assert.ok(!existsSync(join(dataDir, 'lists.json.corrupt')));
+  } finally {
+    chmodSync(join(dataDir, 'lists.json'), 0o644);
+  }
+  assert.equal(texts(onDisk(dataDir), GROCERIES).length, 3);
+});
+
+test('a second broken file does not overwrite the first one kept aside', async () => {
+  const dataDir = emptyDataDir();
+  writeFileSync(join(dataDir, 'lists.json'), 'first broken');
+  await new ListStore(dataDir).load();
+  writeFileSync(join(dataDir, 'lists.json'), 'second broken');
+  await new ListStore(dataDir).load();
+  assert.equal(readFileSync(join(dataDir, 'lists.json.corrupt'), 'utf8'), 'first broken');
+  const dated = readdirSync(dataDir).filter((name) => name.startsWith('lists.json.corrupt-'));
+  assert.equal(dated.length, 1);
+  assert.equal(readFileSync(join(dataDir, dated[0]), 'utf8'), 'second broken');
 });

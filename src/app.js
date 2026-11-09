@@ -49,11 +49,17 @@ export function registerHandlers(gladys, options = {}) {
         await hub.resync(config);
         return;
       }
-      started = true;
       await hub.start(config);
+      started = true;
     } catch (err) {
-      logger.error('Initialization failed', err);
-      await gladys.setConnectionStatus(false, INIT_FAILED).catch(() => {});
+      if (started) {
+        // The lists are loaded and work: the next reconnection resynchronizes.
+        logger.warn(`Resynchronization failed: ${err.message}`);
+      } else {
+        // Tried again at the next connection.
+        logger.error('Initialization failed', err);
+        await gladys.setConnectionStatus(false, INIT_FAILED).catch(() => {});
+      }
     } finally {
       resolveReady();
     }

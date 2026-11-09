@@ -238,7 +238,7 @@ async function action(hub, { actionKey, params = {}, values = {} }) {
       };
     }
     const done = actionKey === ACTIONS.CHECK;
-    const { list, item, changed } = await hub.setDone({
+    const { list, item } = await hub.setDone({
       listId,
       itemId: String(values.item ?? ''),
       done,
@@ -248,11 +248,7 @@ async function action(hub, { actionKey, params = {}, values = {} }) {
       return { message: allLanguages('itemGone', '', hub.displayName(list)) };
     }
     return {
-      message: allLanguages(
-        changed && !done ? 'unchecked' : 'checked',
-        item.text,
-        hub.displayName(list),
-      ),
+      message: allLanguages(done ? 'checked' : 'unchecked', item.text, hub.displayName(list)),
     };
   } catch (err) {
     throw err instanceof UserError ? new Error(err.localized(hub.config.language)) : err;
