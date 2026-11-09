@@ -410,3 +410,28 @@ test('set_item_done finds an item added with a text longer than the limit', asyn
   });
   assert.equal(ack.data.outputs.found, true);
 });
+
+test('overlapping minute checks and a failed record never send an overdue event twice', async (t) => {
+  const clock = createClock(Date.UTC(2026, 10, 9, 19, 0));
+  const w = await world(t, { clock });
+  const before = events(w, 'task_overdue').length;
+  t.mock.method(w.hub.store, 'save', async () => {
+    throw new Error('ENOSPC');
+  });
+  clock.advance(5 * MINUTE);
+  await Promise.all([w.hub.tick(), w.hub.tick()]);
+  await w.hub.tick();
+  assert.equal(events(w, 'task_overdue').length, before + 1);
+});
+
+test('deleting by the name given in Gladys never picks another list', async (t) => {
+  const w = await world(t);
+  await createAll(w);
+  // The groceries device is renamed like the stored name of the other list.
+  await w.fake.deviceUpdated({ ...w.fake.devices[0], name: 'Maison' });
+  await w.fake.action('delete_list', { name: 'Maison' });
+  assert.deepEqual(
+    w.hub.lists.map((list) => list.name),
+    ['Courses'],
+  );
+});

@@ -238,3 +238,31 @@ test('a second broken file does not overwrite the first one kept aside', async (
   assert.equal(dated.length, 1);
   assert.equal(readFileSync(join(dataDir, dated[0]), 'utf8'), 'second broken');
 });
+
+test('the same broken file is kept once, whatever the number of restarts', async () => {
+  const dataDir = emptyDataDir();
+  writeFileSync(join(dataDir, 'lists.json'), 'broken');
+  for (let i = 0; i < 3; i += 1) {
+    await new ListStore(dataDir).load();
+  }
+  assert.deepEqual(readdirSync(dataDir).sort(), ['lists.json', 'lists.json.corrupt']);
+});
+
+test('while lists.json cannot be read, every command is refused and nothing is written', async (t) => {
+  const dataDir = fixtureDataDir();
+  const store = new ListStore(dataDir);
+  t.mock.method(store, 'load', async () => {
+    throw Object.assign(new Error('EIO: i/o error'), { code: 'EIO' });
+  });
+  const w = await world(t, { store });
+  const ack = await w.fake.action('create_list', { name: 'Nouvelle', kind: 'shopping' });
+  assert.equal(ack.success, false);
+  assert.match(ack.error, /not loaded/);
+  assert.equal(texts(onDisk(dataDir), GROCERIES).length, 3);
+  assert.ok(!existsSync(join(dataDir, 'lists.json.bak')));
+  // The next connection tries again.
+  store.load.mock.restore();
+  await w.gladys.disconnect();
+  await w.gladys.connect();
+  assert.equal(w.hub.lists.length, 2);
+});

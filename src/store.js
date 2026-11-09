@@ -14,7 +14,7 @@
 // with no list and says so in the logs. Nothing is ever deleted.
 // -----------------------------------------------------------------------------
 
-import { constants, copyFile, mkdir, open, readFile, rename } from 'node:fs/promises';
+import { constants, copyFile, mkdir, open, readdir, readFile, rename } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createLogger } from '@gladysassistant/integration-sdk';
 import { emptyDocument, normalizeDocument, SCHEMA_VERSION } from './lists/model.js';
@@ -48,6 +48,21 @@ export class ListStore {
     return normalizeDocument(raw);
   }
 
+  /** The `.corrupt*` file already holding the current lists.json, if any. */
+  async keptCopy() {
+    const current = await readFile(this.path);
+    const names = (await readdir(this.directory)).filter((name) =>
+      name.startsWith(`${FILE_NAME}.corrupt`),
+    );
+    for (const name of names) {
+      const path = join(this.directory, name);
+      if (current.equals(await readFile(path))) {
+        return path;
+      }
+    }
+    return null;
+  }
+
   /**
    * @returns {Promise<{ document: object, source: 'file'|'backup'|'new'|'reset' }>}
    */
@@ -64,13 +79,16 @@ export class ListStore {
       }
       if (err.code !== 'ENOENT') {
         mainProblem = err;
-        // A first broken file is never overwritten by a second one.
-        const kept = await copyFile(this.path, this.corruptPath, constants.COPYFILE_EXCL)
-          .then(() => this.corruptPath)
-          .catch(() => {
-            const dated = `${this.corruptPath}-${Date.now()}`;
-            return copyFile(this.path, dated).then(() => dated);
-          });
+        // A first broken file is never overwritten by a second one, and the
+        // same broken file is kept once, however many restarts.
+        const kept =
+          (await this.keptCopy()) ??
+          (await copyFile(this.path, this.corruptPath, constants.COPYFILE_EXCL)
+            .then(() => this.corruptPath)
+            .catch(() => {
+              const dated = `${this.corruptPath}-${Date.now()}`;
+              return copyFile(this.path, dated).then(() => dated);
+            }));
         this.mainUnreadable = true;
         logger.error(`Cannot read ${this.path} (${err.message}): kept as ${kept}`);
       }

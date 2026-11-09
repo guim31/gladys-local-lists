@@ -55,6 +55,13 @@ export class ListsHub {
     this.timer = null;
     // Problems logged once, until they are over (key → message).
     this.problems = new Map();
+    // False until lists.json was read: no change may run on an empty
+    // document that would then replace the real lists on disk.
+    this.loaded = false;
+    // Overdue events sent but not yet recorded in the file
+    // (`listId:itemId:due`), and the guard against two overlapping ticks.
+    this.overdueSent = new Set();
+    this.ticking = false;
   }
 
   // --- Quiet logs: one line when a problem starts, one when it ends --------
@@ -80,6 +87,7 @@ export class ListsHub {
     this.config = config;
     const { document, source } = await this.store.load();
     this.document = document;
+    this.loaded = true;
     logger.info(
       `${document.lists.length} list(s) loaded (${source === 'new' ? 'first start' : source})`,
     );
@@ -235,6 +243,9 @@ export class ListsHub {
    */
   mutate(change, { source } = {}) {
     const run = this.queue.then(async () => {
+      if (!this.loaded) {
+        throw new Error('The lists are not loaded: see the integration logs');
+      }
       const draft = structuredClone(this.document);
       const effects = { events: [], structure: false, changed: false };
       const result = change(draft, effects);
@@ -314,9 +325,15 @@ export class ListsHub {
   deleteList({ name }) {
     return this.mutate((draft, effects) => {
       const wanted = matchKey(name);
-      const index = draft.lists.findIndex(
-        (list) => matchKey(list.name) === wanted || matchKey(this.displayName(list)) === wanted,
-      );
+      // The list's own name first; the name given in Gladys only when it
+      // designates one list and no other.
+      let index = draft.lists.findIndex((list) => matchKey(list.name) === wanted);
+      if (index < 0) {
+        const byDevice = draft.lists.flatMap((list, i) =>
+          matchKey(this.displayName(list)) === wanted ? [i] : [],
+        );
+        index = byDevice.length === 1 ? byDevice[0] : -1;
+      }
       if (index < 0) {
         throw new UserError('noListNamed', '', cleanText(name, LIMITS.name));
       }
@@ -493,6 +510,18 @@ export class ListsHub {
    * is unreachable, it is tried again every minute.
    */
   async tick() {
+    if (!this.loaded || this.ticking) {
+      return;
+    }
+    this.ticking = true;
+    try {
+      await this.checkOverdue();
+    } finally {
+      this.ticking = false;
+    }
+  }
+
+  async checkOverdue() {
     await this.queue;
     const overdue = this.overdueTest();
     const pending = [];
@@ -501,6 +530,9 @@ export class ListsHub {
         for (const item of list.items.filter(
           (entry) => overdue(entry) && !entry.overdue_notified,
         )) {
+          if (this.overdueSent.has(`${list.id}:${item.id}:${item.due}`)) {
+            continue; // sent, but its record failed: never sent twice
+          }
           pending.push({
             listId: list.id,
             itemId: item.id,
@@ -511,6 +543,9 @@ export class ListsHub {
       }
     }
     const sent = await this.fire(pending);
+    for (const { listId, itemId, data } of sent) {
+      this.overdueSent.add(`${listId}:${itemId}:${data.due}`);
+    }
     if (sent.length > 0) {
       await this.mutate((draft, effects) => {
         for (const { listId, itemId } of sent) {
@@ -523,7 +558,10 @@ export class ListsHub {
           }
         }
       })
-        .then(() => this.resolved('save'))
+        .then(() => {
+          this.overdueSent.clear();
+          this.resolved('save');
+        })
         .catch((err) => this.problem('save', `Overdue tasks not recorded: ${err.message}`));
     }
     await this.publishStates();

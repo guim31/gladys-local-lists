@@ -38,6 +38,9 @@ export function registerHandlers(gladys, options = {}) {
     (fn) =>
     async (...args) => {
       await ready;
+      if (!hub.loaded) {
+        throw new Error('The lists are not loaded yet: see the integration logs');
+      }
       return fn(...args);
     };
 
