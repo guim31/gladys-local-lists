@@ -1,8 +1,8 @@
 {
-  "name": "gladys-integration-template-js",
+  "name": "gladys-local-lists",
   "version": "1.0.0",
   "private": true,
-  "description": "Official starter template to build an external integration for Gladys Assistant with the JavaScript SDK.",
+  "description": "Shopping lists and to-do lists stored in Gladys Assistant, with no cloud.",
   "type": "module",
   "main": "index.js",
   "scripts": {

@@ -32,14 +32,18 @@ pushing.
 
 ```
 index.js                          SDK wiring only: handlers registered before connect()
-src/devices/index.js              registry of the device blueprints + dispatch helpers
-src/devices/<type>.js             one device type per file (buildDevice, onPoll, onSetValue...)
+src/app.js                        registers every handler on the SDK (or its fake Gladys)
+src/hub.js                        the lists in memory, every change (serialized), events, minute timer
+src/store.js                      /data/lists.json: atomic write, backup, corrupt file kept aside
+src/lists/model.js                document schema (version 1), normalization, limits, item order
+src/lists/dates.js                due dates in the local time of Gladys (TZ)
+src/devices.js                    one device per list: remaining items, overdue tasks
 src/scenes.js                     scene action handlers (manifest `scene_actions`)
-src/widgets.js                    dashboard widget handlers (manifest `widgets`)
+src/widgets.js                    the "list" dashboard widget (manifest `widgets`)
+src/texts.js                      messages in four languages, UserError
 src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults) + normalization
-src/weather.js                    example driver (Open-Meteo)
 gladys-assistant-integration.json manifest: name, config_schema, actions, image...
-docs/en.md, docs/fr.md            user documentation, re-hosted by Gladys (mandatory)
+docs/{en,fr,de,es}.md             user documentation, re-hosted by Gladys (mandatory)
 test/                             node --test, against the SDK's fake Gladys (integration-sdk/testing)
 .github/scripts/release.mjs       release helpers (manifest bump, changelog), tested in test/
 ```
@@ -251,3 +255,29 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
 - Docs `en`, `fr`, `de`, `es` avec les mêmes sections.
 - Chauffe, ouverture, sécurité : ne rien rendre pilotable « comme un thermostat » ou par un assistant
   vocal quand une erreur serait dangereuse (leçon d'OctoPrint).
+
+## Listes locales (cette intégration)
+
+- **Pas de service externe** : les listes vivent dans `/data/lists.json` (`schema: 1`). Toute
+  modification passe par `ListsHub.mutate` : une à la fois (file de promesses), sur une copie,
+  écrite (fichier temporaire + `fsync` + `rename`, l'ancien copié en `.bak`) **avant** de devenir
+  l'état courant et d'émettre états, événements et rafraîchissement du widget. Une écriture ratée
+  ne change rien et remonte `saveFailed`. Un fichier illisible est copié en `.corrupt`, la
+  sauvegarde est lue, et la première écriture suivante ne copie pas le fichier cassé sur `.bak`.
+- **Identité** : `externalIds('list', <id aléatoire de 12 hex>)`, jamais le nom. Une liste ne
+  change jamais de type (`shopping` / `tasks`) : la structure d'un appareil est figée.
+- **Gestion des listes par les actions de Configuration** (`create_list`, `delete_list`,
+  `show_lists`) : pas de `source: "devices"` possible pour une liste pas encore ajoutée, d'où la
+  suppression par nom exact (confirmation). Pas de renommage : on renomme l'appareil dans Gladys,
+  et `displayName` lit `gladys.devices` (widget, sorties et variables de scène).
+- **Échéances** stockées en heure locale (`YYYY-MM-DD` ou `YYYY-MM-DDTHH:MM`), comparées en
+  chaînes à `localNow(now, TZ)`. Une tâche en retard déclenche `task_overdue` une fois
+  (`overdue_notified` dans le fichier, remis à zéro quand la tâche est décochée ou reprogrammée).
+- **Piège du SDK** : `publishChangedStates(…, { heartbeat })` date les états avec l'horloge
+  système, pas l'horloge injectée : le test du heartbeat simule `Date` (`t.mock.timers`).
+- **Piège des messages** : `onWidgetAction` ne reçoit pas la langue de l'utilisateur ; le toast
+  part en objet `{ en, fr, de, es }`, les erreurs dans la langue configurée.
+- **Assistant (chat)** : le SDK 0.16 n'offre aucun moyen d'exposer les listes à l'assistant de
+  Gladys ; seules les scènes y donnent accès. Dit dans la documentation.
+- `matchKey` ignore casse, accents et ligatures (`Œufs` = `oeufs`) pour retrouver un élément par
+  son texte.

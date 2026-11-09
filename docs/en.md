@@ -1,61 +1,132 @@
-# Demo Devices Template
+# Local lists
 
-This is the user documentation of the integration. Gladys re-hosts this file
-and shows a permanent **Documentation** link to it in the Configuration screen
-(in the user's language, with English as the fallback) — it is when
-configuring that the user needs it most. Keep the short onboarding hints in
-the `section` blocks of the manifest `config_schema`; put the long
-step-by-step (screenshots, troubleshooting…) here.
+Shopping lists and to-do lists kept **in Gladys itself**: no account, no
+cloud, no other server. Show a list on the dashboard, add or check off an
+item with a tap, let a scene put "bin bags" on the shopping list, remind you
+of a task that is overdue, or read the list aloud before you leave.
 
-## What you get
+> **Feedback welcome.** This integration was tested with the test Gladys of
+> the SDK and in its Docker image, not yet in everyday use with a real
+> Gladys. If something does not work as described, please say so on the
+> [Gladys forum](https://community.gladysassistant.com) or in the
+> [issues](https://github.com/guim31/gladys-local-lists/issues).
 
-Six demo devices show up after installation: a weather station (real data
-from Open-Meteo), a switch, a dimmable light, a smart plug with power
-metering, a motion sensor and a camera.
+## What you need
 
-## Configuration
+- Gladys Assistant 5.2.0 or later (the forms of the widget buttons).
+- Nothing else: the lists are stored by the integration in its own volume.
 
-1. Open the **Configuration** tab of the integration.
-2. Set the **latitude** and **longitude** the demo weather station should
-   observe (they default to Paris), and pick your temperature unit.
-   The **refresh interval** sets how often the weather station and the
-   plug's power are read: every 5 minutes by default, every minute at most.
-3. Save: the devices appear in the **Discovery** tab, ready to be added.
+## Set up
 
-The **Prefer the local connection** toggle drives the demo plug: it reports
-the channel it actually uses as a badge (local or cloud), with an orange dot
-when it runs degraded (local refused, cloud fallback).
+1. Install the integration, open its **Configuration** tab.
+2. **Create a list**: type its name (e.g. `Groceries`) and choose its kind:
+   - **Shopping list**: items to buy;
+   - **To-do list (due dates)**: tasks, each with an optional due date.
+3. Open the **Discovery** tab and add the list: it becomes a device of
+   Gladys, which you can rename and put in a room.
+4. Add the **Local list** widget to a dashboard.
 
-## Actions
+**Show the lists** gives the lists and how many items are left on each.
+**Delete a list** deletes a list and its items for good: type its exact name
+to confirm. Then delete its device in Gladys too. A list cannot be renamed
+here: rename its device in Gladys, the widget and the scenes use that name.
 
-- **Test the weather provider** — performs a live request to Open-Meteo and
-  shows the current temperature and humidity under the button.
-- **Identify a device** — pick one of your devices in the list and it will
-  signal itself (the demo light "blinks" in the logs).
+**Language of the feature names**: the language of the names given to the
+features when a list is added, and of the messages sent to scenes (French by
+default).
 
-## Scenes
+## Devices
 
-The integration adds its own cards to the scene editor (Gladys 5.1 or
-later), under the **Integrations** category:
+One device per list, with:
 
-- **Motion detected** (trigger) — starts the scene when a demo motion sensor
-  sees something move. Optionally pick the sensor and what moved (person,
-  animal); left empty, any detection matches. The following actions can
-  read what moved with `{{triggerEvent.data.target}}`.
-- **Identify a device** (action) — makes the chosen device signal itself.
-  It returns whether the device could signal itself, so the following
-  actions can depend on it.
+- **Items to buy** (shopping list) or **Tasks to do** (to-do list): the
+  number of items not checked off yet;
+- **Overdue tasks** (to-do lists only): the tasks whose due date has passed.
+
+These figures are kept in the history, and work in the scene conditions of
+Gladys ("if more than 10 items to buy…"). A due date without a time is
+overdue the next day; a due date with a time, the minute after.
 
 ## Dashboard
 
-Add the **Demo status** widget to a dashboard: it shows the live
-temperature of the weather station and the power of the office plug, the
-connection the plug currently uses (orange when degraded) and the observed
-location. Its **Identify the light** button makes the demo light signal
-itself.
+The **Local list** widget shows a list: the number of items left, the items
+(ten rows at most; the tasks with their due date, the overdue ones in red),
+and four buttons:
+
+- **Add**: an item, and for a to-do list an optional due date;
+- **Check off** and **Uncheck**: choose the item in a list;
+- **Clear done**: removes the checked-off items, after a confirmation.
+
+Settings: the list (empty: the first one), **Show the done items**, and
+**Buttons to hide** (e.g. a wall tablet that only shows the list).
+
+## Scenes
+
+### Triggers
+
+- **Item added to a local list**: an item was added from the widget or a
+  scene, or a checked-off item is back on the list. Variables: the item, the
+  list, the due date.
+- **Item checked off a local list**: variables: the item, the list, the
+  number of items left.
+- **Local list done**: the last item left on a list was checked off.
+- **Task overdue**: a task passed its due date without being checked off,
+  once per task (again if it is unchecked then overdue again). A task that
+  became overdue while Gladys was off fires at the next start.
+
+Each trigger can be limited to one list (empty: any list).
+
+### Actions
+
+- **Add to a local list**: the list, the item, and for a to-do list an
+  optional due date: `2026-11-20`, `20/11/2026` (day first), `20/11/2026 18:30`, or
+  `+N` for N days from today (`+0` is today, `+1 08:00` tomorrow at 8 am).
+  An item already on the list is not added twice (a task gets the new due
+  date); an item checked off before is put back.
+- **Check off a local list item**: by its text (case and accents ignored),
+  done or back to do. Outputs: found, changed, number left.
+- **Clear done items of a local list**: output: the number removed.
+- **Read a local list**: outputs: the items left as one text
+  (`Milk, Eggs, Bread`), their number, the overdue tasks. To send in a
+  message or to say aloud.
+
+### Scene ideas
+
+- Every Monday at 7 pm: "Add to a local list" Take the bins out, to the
+  chores list, due `+0 20:00`. Not done at 8 pm: "Task overdue" reminds you.
+- An NFC tag on the cupboard: "Add to a local list" coffee.
+- When you leave home (presence): "Read a local list", then send its text to
+  your phone.
+- "Task overdue": a Telegram message with the task and its list.
+- "Local list done": a notification "Everything is bought".
+
+The Gladys chat assistant cannot read or fill the lists by itself: the SDK
+of the integrations gives no way to do it in Gladys 5.3. Scenes are the way.
+
+## Your data
+
+Everything is stored in one file, `lists.json`, in the volume of the
+integration (`/data`), with the previous version as `lists.json.bak`. Each
+change is written to a temporary file then renamed: a power cut never leaves
+half a file. If the file is unreadable at start, it is kept as
+`lists.json.corrupt` and the backup is read instead. Uninstalling the
+integration deletes its volume, and the lists with it.
 
 ## Troubleshooting
 
-The integration logs everything it does: check the integration logs from the
-Gladys UI (or `docker logs` on the host) with `LOG_LEVEL=debug` for the full
-detail.
+- **The list is not in the scenes or in the widget settings**: add its
+  device in the Discovery tab first.
+- **"Due date not understood"**: use `2026-11-20`, `20/11/2026 18:30` or
+  `+3`.
+- **"The lists could not be saved"**: the volume of the integration is full
+  or read-only; nothing was changed. See the logs of the integration.
+- Logs: in Gladys, the integration page, **Logs**. Start the integration
+  with `LOG_LEVEL=debug` for more detail.
+
+## Limits
+
+- 50 lists, 500 items per list, 200 characters per item, 40 per list name.
+- No sub-tasks, no recurring tasks, no sharing outside Gladys: the lists
+  live in Gladys only. A recurring task is a scene that adds it.
+- The widget shows ten rows; the forms offer the first fifty items.
+- No import from or export to another service.
