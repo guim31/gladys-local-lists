@@ -1,177 +1,884 @@
 {
   "manifest_version": 1,
   "type": "device",
-  "name": "Demo Devices Template",
+  "name": "Local lists",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "Shopping lists and to-do lists stored in Gladys: dashboard, scenes, overdue tasks. No cloud.",
+    "fr": "Listes de courses et de tâches stockées dans Gladys : tableau de bord, scènes, retards. Sans cloud.",
+    "de": "Einkaufs- und Aufgabenlisten in Gladys gespeichert: Dashboard, Szenen, Überfälliges. Ohne Cloud.",
+    "es": "Listas de la compra y de tareas guardadas en Gladys: panel, escenas, retrasos. Sin nube."
   },
   "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
-  "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "docker_image": "ghcr.io/guim31/gladys-local-lists:1.0.0",
+  "gladys_version": ">=5.2.0",
+  "cover_image": "https://raw.githubusercontent.com/guim31/gladys-local-lists/main/cover.png",
+  "categories": ["services"],
+  "transports": ["local"],
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
-      "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+      "label": {
+        "en": "Your lists",
+        "fr": "Vos listes",
+        "de": "Deine Listen",
+        "es": "Sus listas"
       },
-      "links": [
+      "description": {
+        "en": "Create a list with the buttons below, then add it in the Discovery tab: it becomes a device, to show on the dashboard (Local list widget) and to use in scenes. Everything stays in Gladys.",
+        "fr": "Créez une liste avec les boutons ci-dessous, puis ajoutez-la dans l'onglet Découverte : elle devient un appareil, à afficher au tableau de bord (widget Liste locale) et à utiliser dans les scènes. Tout reste dans Gladys.",
+        "de": "Erstelle eine Liste mit den Schaltflächen unten und füge sie dann im Tab Erkennung hinzu: So wird sie zu einem Gerät, das du im Dashboard (Widget Lokale Liste) und in Szenen nutzen kannst. Alles bleibt in Gladys.",
+        "es": "Cree una lista con los botones de abajo y luego añádala en la pestaña Descubrimiento: se convierte en un dispositivo, para mostrar en el panel (widget Lista local) y usar en las escenas. Todo se queda en Gladys."
+      }
+    },
+    {
+      "key": "language",
+      "type": "select",
+      "label": {
+        "en": "Language of the feature names",
+        "fr": "Langue des noms de fonctionnalités",
+        "de": "Sprache der Funktionsnamen",
+        "es": "Idioma de los nombres de funciones"
+      },
+      "description": {
+        "en": "Names given to the features when a list is added, and texts sent to scenes.",
+        "fr": "Noms donnés aux fonctionnalités à l'ajout d'une liste, et textes envoyés aux scènes.",
+        "de": "Namen der Funktionen beim Hinzufügen einer Liste und an Szenen gesendete Texte.",
+        "es": "Nombres de las funciones al añadir una lista y textos enviados a las escenas."
+      },
+      "required": false,
+      "default": "fr",
+      "options": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "value": "en",
+          "label": {
+            "en": "English",
+            "fr": "Anglais",
+            "de": "Englisch",
+            "es": "Inglés"
+          }
+        },
+        {
+          "value": "fr",
+          "label": {
+            "en": "French",
+            "fr": "Français",
+            "de": "Französisch",
+            "es": "Francés"
+          }
+        },
+        {
+          "value": "de",
+          "label": {
+            "en": "German",
+            "fr": "Allemand",
+            "de": "Deutsch",
+            "es": "Alemán"
+          }
+        },
+        {
+          "value": "es",
+          "label": {
+            "en": "Spanish",
+            "fr": "Espagnol",
+            "de": "Spanisch",
+            "es": "Español"
+          }
         }
       ]
-    },
-    {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
-      "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
-      "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
-    },
-    {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
-      "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
-      "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
-    },
-    {
-      "key": "unit",
-      "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
-      "required": false,
-      "default": "celsius",
-      "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
-      ]
-    },
-    {
-      "key": "poll_frequency",
-      "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
-      "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
-      },
-      "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
     }
   ],
   "actions": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
-      "timeout_seconds": 30
-    },
-    {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
+      "key": "create_list",
+      "label": {
+        "en": "Create a list",
+        "fr": "Créer une liste",
+        "de": "Liste erstellen",
+        "es": "Crear una lista"
+      },
+      "description": {
+        "en": "A new list, then to be added in the Discovery tab.",
+        "fr": "Une nouvelle liste, à ajouter ensuite dans l'onglet Découverte.",
+        "de": "Eine neue Liste, danach im Tab Erkennung hinzuzufügen.",
+        "es": "Una nueva lista, que luego se añade en la pestaña Descubrimiento."
+      },
       "fields": [
         {
-          "key": "device",
+          "key": "name",
+          "type": "string",
+          "required": true,
+          "label": {
+            "en": "Name",
+            "fr": "Nom",
+            "de": "Name",
+            "es": "Nombre"
+          },
+          "placeholder": {
+            "en": "e.g. Groceries",
+            "fr": "ex. Courses",
+            "de": "z. B. Einkauf",
+            "es": "p. ej. Compra"
+          }
+        },
+        {
+          "key": "kind",
           "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
+          "required": true,
+          "label": {
+            "en": "Kind",
+            "fr": "Type",
+            "de": "Art",
+            "es": "Tipo"
+          },
+          "options": [
+            {
+              "value": "shopping",
+              "label": {
+                "en": "Shopping list",
+                "fr": "Liste de courses",
+                "de": "Einkaufsliste",
+                "es": "Lista de la compra"
+              }
+            },
+            {
+              "value": "tasks",
+              "label": {
+                "en": "To-do list (due dates)",
+                "fr": "Liste de tâches (échéances)",
+                "de": "Aufgabenliste (Fälligkeiten)",
+                "es": "Lista de tareas (fechas límite)"
+              }
+            }
+          ]
         }
       ]
+    },
+    {
+      "key": "delete_list",
+      "label": {
+        "en": "Delete a list",
+        "fr": "Supprimer une liste",
+        "de": "Liste löschen",
+        "es": "Eliminar una lista"
+      },
+      "description": {
+        "en": "Deletes the list and all its items, for good. Type its exact name to confirm.",
+        "fr": "Supprime la liste et tous ses éléments, définitivement. Saisissez son nom exact pour confirmer.",
+        "de": "Löscht die Liste und alle ihre Einträge endgültig. Gib zur Bestätigung ihren genauen Namen ein.",
+        "es": "Elimina la lista y todos sus elementos, de forma definitiva. Escriba su nombre exacto para confirmar."
+      },
+      "fields": [
+        {
+          "key": "name",
+          "type": "string",
+          "required": true,
+          "label": {
+            "en": "Name of the list",
+            "fr": "Nom de la liste",
+            "de": "Name der Liste",
+            "es": "Nombre de la lista"
+          }
+        }
+      ]
+    },
+    {
+      "key": "show_lists",
+      "label": {
+        "en": "Show the lists",
+        "fr": "Afficher les listes",
+        "de": "Listen anzeigen",
+        "es": "Mostrar las listas"
+      },
+      "description": {
+        "en": "The lists and what is left on each.",
+        "fr": "Les listes et ce qu'il reste dans chacune.",
+        "de": "Die Listen und was auf jeder noch offen ist.",
+        "es": "Las listas y lo que queda en cada una."
+      }
     }
   ],
   "scene_triggers": [
     {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
+      "key": "item_added",
+      "label": {
+        "en": "Item added to a local list",
+        "fr": "Élément ajouté à une liste locale",
+        "de": "Eintrag zu einer lokalen Liste hinzugefügt",
+        "es": "Elemento añadido a una lista local"
+      },
       "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
+        "en": "An item was put on a list (widget or scene), or a done item is back to do.",
+        "fr": "Un élément a été ajouté à une liste (widget ou scène), ou un élément fait est de nouveau à faire.",
+        "de": "Ein Eintrag wurde auf eine Liste gesetzt (Widget oder Szene), oder ein erledigter ist wieder offen.",
+        "es": "Se ha añadido un elemento a una lista (widget o escena), o un elemento hecho vuelve a estar pendiente."
       },
       "fields": [
         {
-          "key": "device",
+          "key": "list",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
-        },
-        {
-          "key": "target",
-          "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
-          "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
-          ]
+          "label": {
+            "en": "List (empty: any)",
+            "fr": "Liste (vide : toutes)",
+            "de": "Liste (leer: alle)",
+            "es": "Lista (vacío: todas)"
+          }
         }
       ],
       "variables": [
         {
-          "key": "target",
+          "key": "item",
           "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
+          "label": {
+            "en": "Item",
+            "fr": "Élément",
+            "de": "Eintrag",
+            "es": "Elemento"
+          }
+        },
+        {
+          "key": "list_name",
+          "type": "string",
+          "label": {
+            "en": "List",
+            "fr": "Liste",
+            "de": "Liste",
+            "es": "Lista"
+          }
+        },
+        {
+          "key": "due",
+          "type": "string",
+          "label": {
+            "en": "Due date",
+            "fr": "Échéance",
+            "de": "Fälligkeit",
+            "es": "Fecha límite"
+          }
+        }
+      ]
+    },
+    {
+      "key": "item_completed",
+      "label": {
+        "en": "Item checked off a local list",
+        "fr": "Élément coché dans une liste locale",
+        "de": "Eintrag auf einer lokalen Liste abgehakt",
+        "es": "Elemento marcado en una lista local"
+      },
+      "description": {
+        "en": "An item was checked off, from the widget or by a scene.",
+        "fr": "Un élément a été coché, depuis le widget ou par une scène.",
+        "de": "Ein Eintrag wurde abgehakt, im Widget oder durch eine Szene.",
+        "es": "Se ha marcado un elemento, desde el widget o por una escena."
+      },
+      "fields": [
+        {
+          "key": "list",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "List (empty: any)",
+            "fr": "Liste (vide : toutes)",
+            "de": "Liste (leer: alle)",
+            "es": "Lista (vacío: todas)"
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "item",
+          "type": "string",
+          "label": {
+            "en": "Item",
+            "fr": "Élément",
+            "de": "Eintrag",
+            "es": "Elemento"
+          }
+        },
+        {
+          "key": "list_name",
+          "type": "string",
+          "label": {
+            "en": "List",
+            "fr": "Liste",
+            "de": "Liste",
+            "es": "Lista"
+          }
+        },
+        {
+          "key": "remaining",
+          "type": "number",
+          "label": {
+            "en": "Items left",
+            "fr": "Éléments restants",
+            "de": "Offene Einträge",
+            "es": "Elementos pendientes"
+          }
+        }
+      ]
+    },
+    {
+      "key": "list_emptied",
+      "label": {
+        "en": "Local list done",
+        "fr": "Liste locale terminée",
+        "de": "Lokale Liste erledigt",
+        "es": "Lista local terminada"
+      },
+      "description": {
+        "en": "The last item left on a list was checked off: nothing left to buy or to do.",
+        "fr": "Le dernier élément restant d'une liste a été coché : plus rien à acheter ni à faire.",
+        "de": "Der letzte offene Eintrag einer Liste wurde abgehakt: nichts mehr zu kaufen oder zu tun.",
+        "es": "Se ha marcado el último elemento pendiente de una lista: ya no queda nada por comprar ni por hacer."
+      },
+      "fields": [
+        {
+          "key": "list",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "List (empty: any)",
+            "fr": "Liste (vide : toutes)",
+            "de": "Liste (leer: alle)",
+            "es": "Lista (vacío: todas)"
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "list_name",
+          "type": "string",
+          "label": {
+            "en": "List",
+            "fr": "Liste",
+            "de": "Liste",
+            "es": "Lista"
+          }
+        }
+      ]
+    },
+    {
+      "key": "task_overdue",
+      "label": {
+        "en": "Task overdue",
+        "fr": "Tâche en retard",
+        "de": "Aufgabe überfällig",
+        "es": "Tarea atrasada"
+      },
+      "description": {
+        "en": "A task of a to-do list passed its due date without being checked off. Once per task.",
+        "fr": "Une tâche a dépassé son échéance sans être cochée. Une fois par tâche.",
+        "de": "Eine Aufgabe hat ihre Fälligkeit überschritten, ohne abgehakt zu sein. Einmal pro Aufgabe.",
+        "es": "Una tarea ha superado su fecha límite sin marcarse. Una vez por tarea."
+      },
+      "fields": [
+        {
+          "key": "list",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "List (empty: any)",
+            "fr": "Liste (vide : toutes)",
+            "de": "Liste (leer: alle)",
+            "es": "Lista (vacío: todas)"
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "item",
+          "type": "string",
+          "label": {
+            "en": "Item",
+            "fr": "Élément",
+            "de": "Eintrag",
+            "es": "Elemento"
+          }
+        },
+        {
+          "key": "list_name",
+          "type": "string",
+          "label": {
+            "en": "List",
+            "fr": "Liste",
+            "de": "Liste",
+            "es": "Lista"
+          }
+        },
+        {
+          "key": "due",
+          "type": "string",
+          "label": {
+            "en": "Due date",
+            "fr": "Échéance",
+            "de": "Fälligkeit",
+            "es": "Fecha límite"
+          }
         }
       ]
     }
   ],
   "scene_actions": [
     {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
+      "key": "add_item",
+      "label": {
+        "en": "Add to a local list",
+        "fr": "Ajouter à une liste locale",
+        "de": "Zu einer lokalen Liste hinzufügen",
+        "es": "Añadir a una lista local"
+      },
       "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
+        "en": "Puts an item on a list. Already there: it is not added twice.",
+        "fr": "Ajoute un élément à une liste. Déjà présent : il n'est pas ajouté deux fois.",
+        "de": "Setzt einen Eintrag auf eine Liste. Schon vorhanden: Er wird nicht doppelt hinzugefügt.",
+        "es": "Añade un elemento a una lista. Si ya está, no se añade dos veces."
       },
       "timeout_seconds": 15,
       "fields": [
         {
-          "key": "device",
+          "key": "list",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
+          "label": {
+            "en": "List",
+            "fr": "Liste",
+            "de": "Liste",
+            "es": "Lista"
+          },
+          "required": true
+        },
+        {
+          "key": "item",
+          "type": "string",
+          "required": true,
+          "label": {
+            "en": "Item",
+            "fr": "Élément",
+            "de": "Eintrag",
+            "es": "Elemento"
+          },
+          "description": {
+            "en": "The text of the item, e.g. Milk. Case and accents are ignored when looking for it.",
+            "fr": "Le texte de l'élément, ex. Lait. Majuscules et accents ignorés pour le retrouver.",
+            "de": "Der Text des Eintrags, z. B. Milch. Groß- und Kleinschreibung und Akzente zählen bei der Suche nicht.",
+            "es": "El texto del elemento, p. ej. Leche. Se ignoran mayúsculas y acentos al buscarlo."
+          }
+        },
+        {
+          "key": "due",
+          "type": "string",
+          "label": {
+            "en": "Due date (tasks, optional)",
+            "fr": "Échéance (tâches, facultatif)",
+            "de": "Fälligkeit (Aufgaben, optional)",
+            "es": "Fecha límite (tareas, opcional)"
+          },
+          "description": {
+            "en": "2026-11-20, 20/11/2026 18:30, or +N for N days from today. Ignored on a shopping list.",
+            "fr": "2026-11-20, 20/11/2026 18:30, ou +N pour dans N jours. Ignorée sur une liste de courses.",
+            "de": "2026-11-20, 20.11.2026 18:30 oder +N für in N Tagen. Bei einer Einkaufsliste ignoriert.",
+            "es": "2026-11-20, 20/11/2026 18:30, o +N para dentro de N días. Se ignora en una lista de la compra."
+          },
+          "placeholder": {
+            "en": "e.g. +1",
+            "fr": "ex. +1",
+            "de": "z. B. +1",
+            "es": "p. ej. +1"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "key": "item",
+          "type": "string",
+          "label": {
+            "en": "Item",
+            "fr": "Élément",
+            "de": "Eintrag",
+            "es": "Elemento"
+          }
+        },
+        {
+          "key": "list_name",
+          "type": "string",
+          "label": {
+            "en": "List",
+            "fr": "Liste",
+            "de": "Liste",
+            "es": "Lista"
+          }
+        },
+        {
+          "key": "already_on_list",
+          "type": "boolean",
+          "label": {
+            "en": "Was already on the list",
+            "fr": "Était déjà dans la liste",
+            "de": "Stand schon auf der Liste",
+            "es": "Ya estaba en la lista"
+          }
+        },
+        {
+          "key": "due",
+          "type": "string",
+          "label": {
+            "en": "Due date",
+            "fr": "Échéance",
+            "de": "Fälligkeit",
+            "es": "Fecha límite"
+          }
+        }
+      ]
+    },
+    {
+      "key": "set_item_done",
+      "label": {
+        "en": "Check off a local list item",
+        "fr": "Cocher un élément de liste locale",
+        "de": "Eintrag einer lokalen Liste abhaken",
+        "es": "Marcar un elemento de lista local"
+      },
+      "description": {
+        "en": "Checks an item off by its text, or puts it back to do. Not found: nothing happens.",
+        "fr": "Coche un élément d'après son texte, ou le remet à faire. Introuvable : rien ne se passe.",
+        "de": "Hakt einen Eintrag anhand seines Textes ab oder setzt ihn zurück. Nicht gefunden: Nichts passiert.",
+        "es": "Marca un elemento según su texto, o lo vuelve a dejar pendiente. Si no se encuentra, no pasa nada."
+      },
+      "timeout_seconds": 15,
+      "fields": [
+        {
+          "key": "list",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "List",
+            "fr": "Liste",
+            "de": "Liste",
+            "es": "Lista"
+          },
+          "required": true
+        },
+        {
+          "key": "item",
+          "type": "string",
+          "required": true,
+          "label": {
+            "en": "Item",
+            "fr": "Élément",
+            "de": "Eintrag",
+            "es": "Elemento"
+          },
+          "description": {
+            "en": "The text of the item, e.g. Milk. Case and accents are ignored when looking for it.",
+            "fr": "Le texte de l'élément, ex. Lait. Majuscules et accents ignorés pour le retrouver.",
+            "de": "Der Text des Eintrags, z. B. Milch. Groß- und Kleinschreibung und Akzente zählen bei der Suche nicht.",
+            "es": "El texto del elemento, p. ej. Leche. Se ignoran mayúsculas y acentos al buscarlo."
+          }
+        },
+        {
+          "key": "state",
+          "type": "select",
+          "required": true,
+          "label": {
+            "en": "New state",
+            "fr": "Nouvel état",
+            "de": "Neuer Zustand",
+            "es": "Nuevo estado"
+          },
+          "options": [
+            {
+              "value": "done",
+              "label": {
+                "en": "Done",
+                "fr": "Fait",
+                "de": "Erledigt",
+                "es": "Hecho"
+              }
+            },
+            {
+              "value": "todo",
+              "label": {
+                "en": "To do",
+                "fr": "À faire",
+                "de": "Offen",
+                "es": "Pendiente"
+              }
+            }
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "key": "item",
+          "type": "string",
+          "label": {
+            "en": "Item",
+            "fr": "Élément",
+            "de": "Eintrag",
+            "es": "Elemento"
+          }
+        },
+        {
+          "key": "list_name",
+          "type": "string",
+          "label": {
+            "en": "List",
+            "fr": "Liste",
+            "de": "Liste",
+            "es": "Lista"
+          }
+        },
+        {
+          "key": "found",
+          "type": "boolean",
+          "label": {
+            "en": "Found on the list",
+            "fr": "Trouvé dans la liste",
+            "de": "Auf der Liste gefunden",
+            "es": "Encontrado en la lista"
+          }
+        },
+        {
+          "key": "changed",
+          "type": "boolean",
+          "label": {
+            "en": "State changed",
+            "fr": "État modifié",
+            "de": "Zustand geändert",
+            "es": "Estado cambiado"
+          }
+        },
+        {
+          "key": "remaining",
+          "type": "number",
+          "label": {
+            "en": "Items left",
+            "fr": "Éléments restants",
+            "de": "Offene Einträge",
+            "es": "Elementos pendientes"
+          }
+        }
+      ]
+    },
+    {
+      "key": "clear_done",
+      "label": {
+        "en": "Clear done items of a local list",
+        "fr": "Vider les éléments faits d'une liste locale",
+        "de": "Erledigte Einträge einer lokalen Liste löschen",
+        "es": "Quitar los elementos hechos de una lista local"
+      },
+      "description": {
+        "en": "Removes the checked-off items of a list, for good.",
+        "fr": "Retire définitivement les éléments cochés d'une liste.",
+        "de": "Entfernt die abgehakten Einträge einer Liste endgültig.",
+        "es": "Quita definitivamente los elementos marcados de una lista."
+      },
+      "timeout_seconds": 15,
+      "fields": [
+        {
+          "key": "list",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "List",
+            "fr": "Liste",
+            "de": "Liste",
+            "es": "Lista"
+          },
           "required": true
         }
       ],
       "outputs": [
         {
-          "key": "signalled",
-          "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
+          "key": "list_name",
+          "type": "string",
+          "label": {
+            "en": "List",
+            "fr": "Liste",
+            "de": "Liste",
+            "es": "Lista"
+          }
+        },
+        {
+          "key": "removed",
+          "type": "number",
+          "label": {
+            "en": "Items removed",
+            "fr": "Éléments retirés",
+            "de": "Entfernte Einträge",
+            "es": "Elementos quitados"
+          }
+        }
+      ]
+    },
+    {
+      "key": "read_list",
+      "label": {
+        "en": "Read a local list",
+        "fr": "Lire une liste locale",
+        "de": "Lokale Liste lesen",
+        "es": "Leer una lista local"
+      },
+      "description": {
+        "en": "Gives the items left as one text, and the counts, for a message or a spoken announcement.",
+        "fr": "Donne les éléments restants en un texte, et les nombres, pour un message ou une annonce vocale.",
+        "de": "Liefert die offenen Einträge als einen Text und die Anzahlen, für eine Nachricht oder eine Sprachansage.",
+        "es": "Da los elementos pendientes en un texto, y los números, para un mensaje o un anuncio por voz."
+      },
+      "timeout_seconds": 15,
+      "fields": [
+        {
+          "key": "list",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "List",
+            "fr": "Liste",
+            "de": "Liste",
+            "es": "Lista"
+          },
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "key": "list_name",
+          "type": "string",
+          "label": {
+            "en": "List",
+            "fr": "Liste",
+            "de": "Liste",
+            "es": "Lista"
+          }
+        },
+        {
+          "key": "remaining",
+          "type": "number",
+          "label": {
+            "en": "Items left",
+            "fr": "Éléments restants",
+            "de": "Offene Einträge",
+            "es": "Elementos pendientes"
+          }
+        },
+        {
+          "key": "overdue",
+          "type": "number",
+          "label": {
+            "en": "Overdue tasks",
+            "fr": "Tâches en retard",
+            "de": "Überfällige Aufgaben",
+            "es": "Tareas atrasadas"
+          }
+        },
+        {
+          "key": "items",
+          "type": "string",
+          "label": {
+            "en": "Items left (text)",
+            "fr": "Éléments restants (texte)",
+            "de": "Offene Einträge (Text)",
+            "es": "Elementos pendientes (texto)"
+          }
         }
       ]
     }
   ],
   "widgets": [
     {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
+      "key": "list",
+      "label": {
+        "en": "Local list",
+        "fr": "Liste locale",
+        "de": "Lokale Liste",
+        "es": "Lista local"
       },
-      "icon": "activity",
-      "action_timeout_seconds": 15
+      "description": {
+        "en": "A list with buttons to add, check off, uncheck and clear the done items.",
+        "fr": "Une liste, avec ajout, coche, décoche et retrait des éléments faits.",
+        "de": "Eine Liste mit Hinzufügen, Abhaken, Zurücksetzen und Löschen der erledigten Einträge.",
+        "es": "Una lista con botones para añadir, marcar, desmarcar y quitar los elementos hechos."
+      },
+      "icon": "check-square",
+      "action_timeout_seconds": 15,
+      "settings": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "required": false,
+          "label": {
+            "en": "List (empty: the first one)",
+            "fr": "Liste (vide : la première)",
+            "de": "Liste (leer: die erste)",
+            "es": "Lista (vacío: la primera)"
+          }
+        },
+        {
+          "key": "show_done",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "label": {
+            "en": "Show the done items",
+            "fr": "Afficher les éléments faits",
+            "de": "Erledigte Einträge anzeigen",
+            "es": "Mostrar los elementos hechos"
+          }
+        },
+        {
+          "key": "hide",
+          "type": "multi_select",
+          "required": false,
+          "label": {
+            "en": "Buttons to hide",
+            "fr": "Boutons à masquer",
+            "de": "Auszublendende Schaltflächen",
+            "es": "Botones que ocultar"
+          },
+          "options": [
+            {
+              "value": "add",
+              "label": {
+                "en": "Add",
+                "fr": "Ajouter",
+                "de": "Hinzufügen",
+                "es": "Añadir"
+              }
+            },
+            {
+              "value": "check",
+              "label": {
+                "en": "Check off",
+                "fr": "Cocher",
+                "de": "Abhaken",
+                "es": "Marcar"
+              }
+            },
+            {
+              "value": "uncheck",
+              "label": {
+                "en": "Uncheck",
+                "fr": "Décocher",
+                "de": "Zurücksetzen",
+                "es": "Desmarcar"
+              }
+            },
+            {
+              "value": "clear",
+              "label": {
+                "en": "Clear done",
+                "fr": "Vider les faits",
+                "de": "Erledigte löschen",
+                "es": "Quitar hechos"
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

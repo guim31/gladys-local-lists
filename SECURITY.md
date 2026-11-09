@@ -30,6 +30,13 @@ Gladys before reporting a problem.
 
 In scope: the code of this repository and the Docker image it publishes.
 
+The integration talks to no service other than Gladys: no network access is
+needed beyond the Gladys host API. It stores the lists, and nothing else, in
+`/data/lists.json` (with `lists.json.bak`, the previous version, and
+`lists.json.corrupt` when an unreadable file was kept aside). These files
+hold household data (shopping items, chores) but no secret; they are
+readable by whoever can read the integration volume on the Gladys host. The
+logs never contain the text of the items.
+
 Out of scope: Gladys Assistant itself (see its
-[security policy](https://github.com/GladysAssistant/Gladys/security/policy)),
-and the third-party services and devices the integration talks to.
+[security policy](https://github.com/GladysAssistant/Gladys/security/policy)).

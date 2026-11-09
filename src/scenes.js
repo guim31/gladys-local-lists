@@ -1,41 +1,86 @@
 // -----------------------------------------------------------------------------
-// Scene actions (SDK v0.14+, Gladys 5.1+).
+// Scene action handlers (manifest `scene_actions`, Gladys 5.1+). The list is
+// a device of the integration (`source: "devices"`); items are found by their
+// text, case and accents ignored, so a scene variable fits too
+// (`{{triggerEvent.data.item}}`).
 //
-// A scene action is an OPERATION a scene author places in a scene, with
-// parameters and a result: "identify this device", "take a snapshot", "clean
-// these rooms". Each one is declared in the manifest `scene_actions` field
-// (key, label, `fields` in the config_schema grammar, scalar `outputs`) and
-// handled here, keyed by that same `key`; index.js registers every entry with
-// `gladys.onSceneAction(key, ...)`.
+// - `add_item`: "the milk is finished" on an NFC tag, the bin day reminder
+//   created every Monday with a due date (`+1`);
+// - `set_item_done`: check off (or put back) an item by name;
+// - `clear_done`: remove the done items, e.g. every Sunday night;
+// - `read_list`: the items left as one text, for a message or a speech.
 //
-// Scene TRIGGERS are the other direction ("this happened"): they are fired by
-// the device that observes the event, see src/devices/motionSensor.js.
-//
-// The rules that matter:
-//   - `fields` arrive RESOLVED: scene variables substituted, defaults applied,
-//     validated by the core; a `"source": "devices"` field is the chosen
-//     device external_id;
-//   - resolve an object of the declared `outputs` (scalars only), readable by
-//     the following actions of the scene, or `undefined` for none. Keys not
-//     declared in the manifest are dropped by the core;
-//   - throwing fails THIS action only: the scene logs it and continues. A
-//     scene action is never a condition: return an output and let the scene
-//     author gate on it;
-//   - never fire a scene event as a consequence of a received action: a scene
-//     bound to that event would loop through the integration.
+// Errors are thrown in the configured language: a scene shows them as is.
 // -----------------------------------------------------------------------------
 
-import { createLogger } from '@gladysassistant/integration-sdk';
-import { signalDevice } from './devices/index.js';
+import { UserError } from './texts.js';
 
-const logger = createLogger({ name: 'scenes' });
+// The `items` output is a string of 1000 characters at most (scene variables).
+const ITEMS_MAX_LENGTH = 1000;
 
-export const SCENE_ACTIONS = {
-  // The ack is awaited under the action's `timeout_seconds` (15 s in the
-  // manifest), counted from the moment the scene reaches the action.
-  async identify_device(gladys, { fields, config }) {
-    logger.info(`Scene action identify_device <- ${fields.device}`);
-    const signalled = await signalDevice(gladys, fields.device, config);
-    return { signalled };
-  },
+function joinItems(items) {
+  let text = '';
+  for (const item of items) {
+    const next = text ? `${text}, ${item}` : item;
+    if (next.length > ITEMS_MAX_LENGTH - 2) {
+      return `${text}…`;
+    }
+    text = next;
+  }
+  return text;
+}
+
+const localize = (hub, fn) => async (fields) => {
+  try {
+    return await fn(fields ?? {});
+  } catch (err) {
+    throw err instanceof UserError ? new Error(err.localized(hub.config.language)) : err;
+  }
 };
+
+export function sceneActions(hub) {
+  return {
+    add_item: localize(hub, async (fields) => {
+      const { list, item, already } = await hub.addItem({
+        device: fields.list,
+        text: fields.item,
+        due: fields.due,
+        source: 'scene',
+      });
+      return {
+        item: item.text,
+        list_name: hub.displayName(list),
+        already_on_list: already,
+        due: item.due ?? '',
+      };
+    }),
+
+    set_item_done: localize(hub, async (fields) => {
+      const { list, item, changed } = await hub.setDone({
+        device: fields.list,
+        text: fields.item,
+        done: fields.state !== 'todo',
+        source: 'scene',
+      });
+      return {
+        item: item?.text ?? String(fields.item ?? ''),
+        list_name: hub.displayName(list),
+        found: item !== null,
+        changed,
+        remaining: list.items.filter((entry) => !entry.done).length,
+      };
+    }),
+
+    clear_done: localize(hub, async (fields) => {
+      const { list, removed } = await hub.clearDone({ device: fields.list, source: 'scene' });
+      return { list_name: hub.displayName(list), removed };
+    }),
+
+    read_list: localize(hub, async (fields) => {
+      const { list, remaining, overdue, items } = hub.readList(fields.list);
+      return { list_name: hub.displayName(list), remaining, overdue, items: joinItems(items) };
+    }),
+  };
+}
+
+export const SCENE_ACTION_KEYS = Object.keys(sceneActions({ config: {} }));
