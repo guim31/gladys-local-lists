@@ -64,6 +64,11 @@ export class ListsHub {
     logger.info(
       `${document.lists.length} list(s) loaded (${source === 'new' ? 'first start' : source})`,
     );
+    if (source === 'backup') {
+      // Put the restored lists back in lists.json at once (the broken file
+      // stays as lists.json.corrupt, the backup is left untouched).
+      await this.store.save(document).catch((err) => logger.error(`Cannot write: ${err.message}`));
+    }
     await this.resync(config);
     if (this.timers) {
       this.timer = setInterval(() => {

@@ -80,6 +80,8 @@ test('a truncated lists.json is kept aside and the backup is read', async (t) =>
     ['Courses', 'Maison'],
   );
   assert.equal(readFileSync(join(dataDir, 'lists.json.corrupt'), 'utf8'), good.slice(0, 200));
+  // The restored lists are written back at once.
+  assert.deepEqual(texts(onDisk(dataDir), GROCERIES), ['Lait', 'Œufs', 'Pain']);
 
   // The first write after it must not copy the broken file over the backup.
   await w.fake.sceneAction('add_item', { list: listIds(w.gladys, GROCERIES).device, item: 'Riz' });
